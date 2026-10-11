@@ -1,0 +1,96 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "VMUsername": {
+            "type": "string",
+            "defaultValue": "labuser"
+        },
+        "VMPassword": {
+            "type": "securestring",
+            "defaultValue": "Password.1!!"
+        },
+        "DeploymentID": {
+            "type": "string"
+        },
+        "scriptFileName": {
+            "type": "string",
+            "defaultValue": "bashscript.sh"
+        },
+        "imgid": {
+            "type": "string"
+        },
+        "disksize": {
+            "type": "string",
+            "defaultValue": "512"
+        },
+        "userEmail": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "scriptFileUri": "https://cloudlabs-prod-templates-s3.s3.us-east-1.amazonaws.com/arrow/bashscript.sh",
+        "vmName": "[concat('labvm-',parameters('DeploymentID'))]",
+        "vmNetworkInterfaceName": "[concat('labvmnic-',parameters('DeploymentID'))]",
+        "networkInterface2Name": "[concat('labvmnic2-',parameters('DeploymentID'))]",
+        "publicIpAddressName": "[concat('labvmpip-',parameters('DeploymentID'))]",
+        "publicIpDnsName": "[concat('labvmpip-', parameters('DeploymentID'))]",
+        "networkSGroupName": "[concat('labvmnsg-', parameters('DeploymentID'))]",
+        "vnetName": "arrow-azure-site-vnet",
+        "subnetName": "/subscriptions/2b39737e-1727-4625-93f2-d5d6739f9a85/resourceGroups/arrow-s2s-vpn/providers/Microsoft.Network/virtualNetworks/arrow-azure-site-vnet/subnets/vm-subnet",
+        "virtualMachineSize": "Standard_D8s_v5",
+        "tenantId": "[subscription().tenantId]",
+        "SubId": "[subscription().subscriptionId]"
+    },
+    "resources": [
+        {
+            "apiVersion": "2016-09-01",
+            "name": "pid-e843308b-3ce2-42a2-b743-2f21b36a5e68",
+            "type": "Microsoft.Resources/deployments",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/disks",
+            "apiVersion": "2022-07-02",
+            "name": "Labvm-OSDisk",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Premium_LRS",
+                "tier": "Premium"
+            },
+            "properties": {
+                "osType": "Windows",
+                "hyperVGeneration": "V2",
+                "supportedCapabilities": {
+                    "architecture": "x64"
+                },
+                "creationData": {
+                    "createOption": "FromImage",
+                    "imageReference": {
+                        "id": "[parameters('imgid')]"
+                    },
+                    "galleryImageReference": {
+                        "id": "[parameters('imgid')]"
+                    }
+                },
+                "diskSizeGB": "[parameters('disksize')]",
+                "diskIOPSReadWrite": 2300,
+                "diskMBpsReadWrite": 150,
+                "encryption": {
+                    "type": "EncryptionAtRestWithPlatformKey"
+                },
+                "networkAccessPolicy": "AllowAll",
+                "publicNetworkAccess": "Enabled",
+                "diskState": "Reserved",
+                "tier": "P20"
+            }
+        },
+        {
+            "name": "[variables('publicIpAddressName')]",
