@@ -1,0 +1,177 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GlueAndLogsUnchanged",
+      "Effect": "Allow",
+      "Action": [
+        "glue:Get*",
+        "glue:List*",
+        "glue:SearchTables",
+        "glue:BatchGetCrawlers",
+        "glue:BatchGetJobs",
+        "glue:CreateDatabase",
+        "glue:CreateTable",
+        "glue:CreateTrigger",
+        "glue:CreateJob",
+        "glue:CreateCrawler",
+        "glue:CreateScript",
+        "glue:CreateClassifier",
+        "glue:CreateSession",
+        "glue:CreateConnection",
+        "glue:CreatePartition",
+        "glue:BatchCreatePartition",
+        "glue:StartCrawler",
+        "glue:StartJobRun",
+        "glue:StartTrigger",
+        "glue:UpdateDatabase",
+        "glue:UpdateTable",
+        "glue:UpdateTrigger",
+        "glue:UpdateJob",
+        "glue:UpdateCrawler",
+        "glue:DeleteDatabase",
+        "glue:DeleteTable",
+        "glue:DeleteTrigger",
+        "glue:DeleteJob",
+        "glue:DeleteCrawler",
+        "glue:DeleteClassifier",
+        "glue:DeleteSession",
+        "glue:DeleteConnection",
+        "glue:DeletePartition",
+        "glue:BatchDeletePartition",
+        "glue:StopSession",
+        "glue:TagResource",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:GetLogEvents",
+        "logs:FilterLogEvents",
+        "logs:DescribeLogGroups",
+        "cloudwatch:GetMetricData"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": ["us-east-1", "us-east-2", "us-west-2"]
+        }
+      }
+    },
+    {
+      "Sid": "IamReadOnlyForConsole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:ListRoles",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRoleTags",
+        "iam:ListPolicies",
+        "iam:GetPolicyVersion",
+        "iam:GetAccountSummary",
+        "iam:ListUsers",
+        "iam:GetUser"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PassOnlyTheLabGlueRoleOnlyToGlue",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/GlueLabServiceRole",
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": "glue.amazonaws.com" }
+      }
+    },
+    {
+      "Sid": "S3ConsoleListing",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListAllMyBuckets",
+        "s3:GetBucketLocation",
+        "s3:GetAccountPublicAccessBlock"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3LabAndGlueAssetBuckets",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket*",
+        "s3:GetBucket*",
+        "s3:GetEncryptionConfiguration",
+        "s3:GetObject*",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts"
+      ],
+      "Resource": [
+        "arn:aws:s3:::glue-lab-*",
+        "arn:aws:s3:::glue-lab-*/*",
+        "arn:aws:s3:::aws-glue-assets-*",
+        "arn:aws:s3:::aws-glue-assets-*/*"
+      ]
+    },
+    {
+      "Sid": "GlueStudioScriptBucket",
+      "Effect": "Allow",
+      "Action": "s3:CreateBucket",
+      "Resource": "arn:aws:s3:::aws-glue-assets-*"
+    },
+    {
+      "Sid": "LakeFormationReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "lakeformation:GetDataAccess",
+        "lakeformation:GetDataLakeSettings",
+        "lakeformation:ListPermissions",
+        "lakeformation:ListResources",
+        "lakeformation:DescribeResource",
+        "lakeformation:GetEffectivePermissionsForPath",
+        "lakeformation:ListLFTags",
+        "lakeformation:GetLFTag",
+        "lakeformation:GetResourceLFTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "GuardrailsDefenseInDepth",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:CreatePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:SetDefaultPolicyVersion",
+        "iam:AttachUserPolicy",
+        "iam:PutUserPolicy",
+        "iam:CreateAccessKey",
+        "iam:CreateServiceLinkedRole",
+        "lakeformation:PutDataLakeSettings",
+        "lakeformation:GrantPermissions",
+        "lakeformation:BatchGrantPermissions",
+        "lakeformation:RevokePermissions",
+        "lakeformation:BatchRevokePermissions",
+        "lakeformation:RegisterResource",
+        "lakeformation:DeregisterResource",
+        "lakeformation:UpdateResource",
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy",
+        "s3:PutBucketAcl",
+        "s3:PutObjectAcl",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:PutAccountPublicAccessBlock",
+        "s3:PutBucketOwnershipControls",
+        "s3:PutObjectRetention",
+        "s3:DeleteBucket"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

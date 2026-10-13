@@ -1,0 +1,463 @@
+{
+    "Parameters": {
+        "CloudLabsDeploymentID": {
+            "Description": "DeploymentID Value",
+            "Type": "String"
+        },
+        "CheckAcknowledgement": {
+            "Description": "CloudLabs acknowledgement flag",
+            "Type": "String",
+            "Default": "TRUE"
+        }
+    },
+    "Resources": {
+        "LabBucket": {
+            "Type": "AWS::S3::Bucket",
+            "DeletionPolicy": "Delete",
+            "Properties": {
+                "BucketName": {
+                    "Fn::Sub": "glue-lab-${AWS::AccountId}-${AWS::Region}"
+                },
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": true,
+                    "BlockPublicPolicy": true,
+                    "IgnorePublicAcls": true,
+                    "RestrictPublicBuckets": true
+                },
+                "OwnershipControls": {
+                    "Rules": [
+                        {
+                            "ObjectOwnership": "BucketOwnerEnforced"
+                        }
+                    ]
+                },
+                "BucketEncryption": {
+                    "ServerSideEncryptionConfiguration": [
+                        {
+                            "ServerSideEncryptionByDefault": {
+                                "SSEAlgorithm": "AES256"
+                            }
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "CloudLabsDeploymentID",
+                        "Value": {
+                            "Ref": "CloudLabsDeploymentID"
+                        }
+                    }
+                ]
+            }
+        },
+        "GlueServiceRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "RoleName": "GlueLabServiceRole",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "glue.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "GlueLabDataAccess",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "ListLabBucket",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ListBucket",
+                                        "s3:GetBucketLocation"
+                                    ],
+                                    "Resource": {
+                                        "Fn::GetAtt": [
+                                            "LabBucket",
+                                            "Arn"
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Sid": "ReadWriteLabObjects",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:GetObject",
+                                        "s3:PutObject",
+                                        "s3:DeleteObject"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Sub": "${LabBucket.Arn}/*"
+                                    }
+                                },
+                                {
+                                    "Sid": "LakeFormationCredentialVending",
+                                    "Effect": "Allow",
+                                    "Action": "lakeformation:GetDataAccess",
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "CloudLabsDeploymentID",
+                        "Value": {
+                            "Ref": "CloudLabsDeploymentID"
+                        }
+                    }
+                ]
+            }
+        },
+        "LakeFormationSetupRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "GlueLabLakeFormationSetup",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "LakeFormationSetup",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "lakeformation:GetDataLakeSettings",
+                                        "lakeformation:PutDataLakeSettings",
+                                        "lakeformation:RegisterResource",
+                                        "lakeformation:GrantPermissions"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Sid": "RetailDatabase",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "glue:CreateDatabase",
+                                        "glue:GetDatabase",
+                                        "glue:GetTable",
+                                        "glue:GetTables"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog"
+                                        },
+                                        {
+                                            "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/retail"
+                                        },
+                                        {
+                                            "Fn::Sub": "arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/retail/*"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Sid": "ReadLearnerGroup",
+                                    "Effect": "Allow",
+                                    "Action": "iam:GetGroup",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:group/Attendees"
+                                    }
+                                },
+                                {
+                                    "Sid": "LakeFormationServiceLinkedRole",
+                                    "Effect": "Allow",
+                                    "Action": "iam:CreateServiceLinkedRole",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/lakeformation.amazonaws.com/AWSServiceRoleForLakeFormationDataAccess"
+                                    },
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "iam:AWSServiceName": "lakeformation.amazonaws.com"
+                                        }
+                                    }
+                                },
+                                {
+                                    "Sid": "UpdateLakeFormationServiceLinkedRole",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:GetRole",
+                                        "iam:PutRolePolicy"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/lakeformation.amazonaws.com/AWSServiceRoleForLakeFormationDataAccess"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "LakeFormationSetupFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Description": "Glue lab: creates the retail database, registers the lab bucket and creates Lake Formation grants, then removes its own admin rights",
+                "Runtime": "python3.12",
+                "Handler": "index.handler",
+                "Timeout": 300,
+                "MemorySize": 128,
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LakeFormationSetupRole",
+                        "Arn"
+                    ]
+                },
+                "Code": {
+                    "ZipFile": "import json,time,urllib.request,boto3\nfrom botocore.exceptions import ClientError\nlf=boto3.client('lakeformation');glue=boto3.client('glue');iam=boto3.client('iam')\ndef send(e,c,s,r=''):\n b=json.dumps({'Status':s,'Reason':(r or 'See log '+c.log_stream_name)[:900],'PhysicalResourceId':'glue-lab-lf-setup','StackId':e['StackId'],'RequestId':e['RequestId'],'LogicalResourceId':e['LogicalResourceId']}).encode()\n urllib.request.urlopen(urllib.request.Request(e['ResponseURL'],data=b,method='PUT',headers={'Content-Type':''}))\ndef admins(me,add):\n s=lf.get_data_lake_settings()['DataLakeSettings']\n a=[x for x in s.get('DataLakeAdmins',[]) if x['DataLakePrincipalIdentifier']!=me]\n if add:a.append({'DataLakePrincipalIdentifier':me})\n s['DataLakeAdmins']=a\n lf.put_data_lake_settings(DataLakeSettings=s)\ndef retry(f,**k):\n for i in range(24):\n  try:return f(**k)\n  except ClientError as x:\n   c=x.response['Error']['Code']\n   if i==23 or not('AccessDenied' in c or 'InvalidInput' in c):raise\n   time.sleep(5)\ndef handler(e,c):\n if e['RequestType']=='Delete':return send(e,c,'SUCCESS')\n p=e['ResourceProperties'];me=p['SetupRoleArn'];a=p['AccountId'];db=p['DatabaseName'];bk=p['BucketArn'];role=p['GlueRoleArn']\n try:\n  admins(me,True)\n  try:retry(glue.create_database,DatabaseInput={'Name':db,'Description':'Glue ETL lab database'})\n  except glue.exceptions.AlreadyExistsException:pass\n  try:retry(lf.register_resource,ResourceArn=bk,UseServiceLinkedRole=True)\n  except lf.exceptions.AlreadyExistsException:pass\n  D={'Database':{'CatalogId':a,'Name':db}}\n  T={'Table':{'CatalogId':a,'DatabaseName':db,'TableWildcard':{}}}\n  L={'DataLocation':{'CatalogId':a,'ResourceArn':bk}}\n  g=[(role,D,['CREATE_TABLE','ALTER','DESCRIBE']),(role,T,['SELECT','INSERT','DELETE','DESCRIBE','ALTER']),(role,L,['DATA_LOCATION_ACCESS'])]\n  try:\n   for u in iam.get_group(GroupName=p['LearnerGroup'])['Users']:\n    g+=[(u['Arn'],D,['DESCRIBE']),(u['Arn'],T,['SELECT','DESCRIBE'])]\n  except iam.exceptions.NoSuchEntityException:print('Learner group not found; learner grants skipped')\n  for pr,r,pm in g:retry(lf.grant_permissions,Principal={'DataLakePrincipalIdentifier':pr},Resource=r,Permissions=pm)\n  admins(me,False)\n  send(e,c,'SUCCESS')\n except Exception as x:\n  print(repr(x))\n  try:admins(me,False)\n  except Exception:pass\n  send(e,c,'FAILED',str(x))\n"
+                }
+            }
+        },
+        "LakeFormationSetup": {
+            "Type": "Custom::GlueLabLakeFormationSetup",
+            "Properties": {
+                "ServiceToken": {
+                    "Fn::GetAtt": [
+                        "LakeFormationSetupFunction",
+                        "Arn"
+                    ]
+                },
+                "SetupRoleArn": {
+                    "Fn::GetAtt": [
+                        "LakeFormationSetupRole",
+                        "Arn"
+                    ]
+                },
+                "AccountId": {
+                    "Ref": "AWS::AccountId"
+                },
+                "DatabaseName": "retail",
+                "BucketArn": {
+                    "Fn::GetAtt": [
+                        "LabBucket",
+                        "Arn"
+                    ]
+                },
+                "GlueRoleArn": {
+                    "Fn::GetAtt": [
+                        "GlueServiceRole",
+                        "Arn"
+                    ]
+                },
+                "LearnerGroup": "Attendees"
+            }
+        },
+        "GlueLabLearnerPolicy": {
+            "Type": "AWS::IAM::ManagedPolicy",
+            "Properties": {
+                "ManagedPolicyName": "GlueLabLearnerPolicy",
+                "Description": "Least-privilege learner policy for the Glue ETL lab",
+                "Path": "/",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "GlueAndLogsUnchanged",
+                            "Effect": "Allow",
+                            "Action": [
+                                "glue:Get*",
+                                "glue:List*",
+                                "glue:SearchTables",
+                                "glue:BatchGetCrawlers",
+                                "glue:BatchGetJobs",
+                                "glue:CreateDatabase",
+                                "glue:CreateTable",
+                                "glue:CreateTrigger",
+                                "glue:CreateJob",
+                                "glue:CreateCrawler",
+                                "glue:CreateScript",
+                                "glue:CreateClassifier",
+                                "glue:CreateSession",
+                                "glue:CreateConnection",
+                                "glue:CreatePartition",
+                                "glue:BatchCreatePartition",
+                                "glue:StartCrawler",
+                                "glue:StartJobRun",
+                                "glue:StartTrigger",
+                                "glue:UpdateDatabase",
+                                "glue:UpdateTable",
+                                "glue:UpdateTrigger",
+                                "glue:UpdateJob",
+                                "glue:UpdateCrawler",
+                                "glue:DeleteDatabase",
+                                "glue:DeleteTable",
+                                "glue:DeleteTrigger",
+                                "glue:DeleteJob",
+                                "glue:DeleteCrawler",
+                                "glue:DeleteClassifier",
+                                "glue:DeleteSession",
+                                "glue:DeleteConnection",
+                                "glue:DeletePartition",
+                                "glue:BatchDeletePartition",
+                                "glue:StopSession",
+                                "glue:TagResource",
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents",
+                                "logs:GetLogEvents",
+                                "logs:FilterLogEvents",
+                                "logs:DescribeLogGroups",
+                                "cloudwatch:GetMetricData"
+                            ],
+                            "Resource": "*",
+                            "Condition": {
+                                "StringEquals": {
+                                    "aws:RequestedRegion": [
+                                        "us-east-1",
+                                        "us-east-2",
+                                        "us-west-2"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "Sid": "IamReadOnlyForConsole",
+                            "Effect": "Allow",
+                            "Action": [
+                                "iam:GetRole",
+                                "iam:ListRoles",
+                                "iam:GetRolePolicy",
+                                "iam:ListRolePolicies",
+                                "iam:ListAttachedRolePolicies",
+                                "iam:ListRoleTags",
+                                "iam:ListPolicies",
+                                "iam:GetPolicyVersion",
+                                "iam:GetAccountSummary",
+                                "iam:ListUsers",
+                                "iam:GetUser"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "PassOnlyTheLabGlueRoleOnlyToGlue",
+                            "Effect": "Allow",
+                            "Action": "iam:PassRole",
+                            "Resource": "arn:aws:iam::*:role/GlueLabServiceRole",
+                            "Condition": {
+                                "StringEquals": {
+                                    "iam:PassedToService": "glue.amazonaws.com"
+                                }
+                            }
+                        },
+                        {
+                            "Sid": "S3ConsoleListing",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:ListAllMyBuckets",
+                                "s3:GetBucketLocation",
+                                "s3:GetAccountPublicAccessBlock"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "S3LabAndGlueAssetBuckets",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:ListBucket*",
+                                "s3:GetBucket*",
+                                "s3:GetEncryptionConfiguration",
+                                "s3:GetObject*",
+                                "s3:PutObject",
+                                "s3:DeleteObject",
+                                "s3:AbortMultipartUpload",
+                                "s3:ListMultipartUploadParts"
+                            ],
+                            "Resource": [
+                                "arn:aws:s3:::glue-lab-*",
+                                "arn:aws:s3:::glue-lab-*/*",
+                                "arn:aws:s3:::aws-glue-assets-*",
+                                "arn:aws:s3:::aws-glue-assets-*/*"
+                            ]
+                        },
+                        {
+                            "Sid": "GlueStudioScriptBucket",
+                            "Effect": "Allow",
+                            "Action": "s3:CreateBucket",
+                            "Resource": "arn:aws:s3:::aws-glue-assets-*"
+                        },
+                        {
+                            "Sid": "LakeFormationReadOnly",
+                            "Effect": "Allow",
+                            "Action": [
+                                "lakeformation:GetDataAccess",
+                                "lakeformation:GetDataLakeSettings",
+                                "lakeformation:ListPermissions",
+                                "lakeformation:ListResources",
+                                "lakeformation:DescribeResource",
+                                "lakeformation:GetEffectivePermissionsForPath",
+                                "lakeformation:ListLFTags",
+                                "lakeformation:GetLFTag",
+                                "lakeformation:GetResourceLFTags"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "GuardrailsDefenseInDepth",
+                            "Effect": "Deny",
+                            "Action": [
+                                "iam:CreateRole",
+                                "iam:DeleteRole",
+                                "iam:AttachRolePolicy",
+                                "iam:DetachRolePolicy",
+                                "iam:PutRolePolicy",
+                                "iam:DeleteRolePolicy",
+                                "iam:UpdateAssumeRolePolicy",
+                                "iam:CreatePolicy",
+                                "iam:CreatePolicyVersion",
+                                "iam:SetDefaultPolicyVersion",
+                                "iam:AttachUserPolicy",
+                                "iam:PutUserPolicy",
+                                "iam:CreateAccessKey",
+                                "iam:CreateServiceLinkedRole",
+                                "lakeformation:PutDataLakeSettings",
+                                "lakeformation:GrantPermissions",
+                                "lakeformation:BatchGrantPermissions",
+                                "lakeformation:RevokePermissions",
+                                "lakeformation:BatchRevokePermissions",
+                                "lakeformation:RegisterResource",
+                                "lakeformation:DeregisterResource",
+                                "lakeformation:UpdateResource",
+                                "s3:PutBucketPolicy",
+                                "s3:DeleteBucketPolicy",
+                                "s3:PutBucketAcl",
+                                "s3:PutObjectAcl",
+                                "s3:PutBucketPublicAccessBlock",
+                                "s3:PutAccountPublicAccessBlock",
+                                "s3:PutBucketOwnershipControls",
+                                "s3:PutObjectRetention",
+                                "s3:DeleteBucket"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}
