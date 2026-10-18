@@ -37,7 +37,6 @@
     "Microsoft.Network/connections/*",
     "Microsoft.ContainerInstance/containerGroups/*",
     "Microsoft.ContainerRegistry/registries/*",
-    "Microsoft.Cdn/profiles/*",
     "Microsoft.insights/*",
     "microsoft.insights/actionGroups/*",
     "microsoft.insights/metricAlerts/*",
