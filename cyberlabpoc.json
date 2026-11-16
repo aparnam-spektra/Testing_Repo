@@ -1,0 +1,787 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "DeploymentID": {
+            "type": "string",
+            "metadata": {
+                "description": "Unique identifier for the deployment"
+            }
+        },
+        "DeploymentRegion": {
+            "type": "string",
+            "defaultValue": "centralus"
+        },
+        "WinServerLabVM01Username": {
+            "type": "string",
+            "metadata": {
+                "description": "Admin username for Windows Server VMs"
+            },
+            "defaultValue": "labuser01"
+        },
+        "WinServerLabVM01Password": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Admin password for Windows Server VMs"
+            },
+            "defaultValue": "Password.1!!"
+        },
+        "WinServerLabVM02Username": {
+            "type": "string",
+            "metadata": {
+                "description": "Admin username for Windows Server VMs"
+            },
+            "defaultValue": "labuser02"
+        },
+        "WinServerLabVM02Password": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Admin password for Windows Server VMs"
+            },
+            "defaultValue": "Password.2!!"
+        },
+        "KaliLabVMUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "Admin username for Windows Server VMs"
+            },
+            "defaultValue": "kaliuser"
+        },
+        "KaliLabVMPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Admin password for Windows Server VMs"
+            },
+            "defaultValue": "Password.3!!"
+        },
+        "MetasploitLabVMUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "Admin username for Windows Server VMs"
+            },
+            "defaultValue": "msfadmin"
+        },
+        "MetasploitLabVMPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Admin password for Windows Server VMs"
+            },
+            "defaultValue": "msfadmin"
+        },
+        "trainerUserName": {
+            "type": "string",
+            "defaultValue": "traineruser"
+        },
+        "trainerUserPassword": {
+            "type": "securestring",
+            "defaultValue": "Password.1!!"
+        }
+    },
+    "variables": {
+        "LabVNet-name": "[concat('LabVNet-',parameters('DeploymentID'))]",
+        "LabVNet-nsg-name": "[concat('LabVNet-nsg-',parameters('DeploymentID'))]",
+        "Kali-Meta-nsg-name":"[concat('Meta-nsg-',parameters('DeploymentID'))]",
+        "KaliVM-name": "[concat('KaliVM-',parameters('DeploymentID'))]",
+        "KaliVM-networkInterface": "[concat('kalivm',parameters('DeploymentID'))]",
+        "KaliVM-publicip": "[concat('KaliVM-ip',parameters('DeploymentID'))]",
+        "KaliVM-OSDisk-Name": "[concat(variables('KaliVM-name'), '_OsDisk_1_', uniqueString(resourceGroup().id))]",
+        "WinServerLabVM01name": "[concat('LabVM01-',parameters('DeploymentID'))]",
+        "WinServerLabVM01-networkInterface": "[concat('labvm01',parameters('DeploymentID'))]",
+        "WinServerLabVM01-publicip": "[concat('LabVM01-ip', parameters('DeploymentID'))]",
+        "WinServerLabVM01-OSDisk-Name": "[concat(variables('WinServerLabVM01name'), '_OsDisk_1_', uniqueString(resourceGroup().id))]",
+        "WinServerLabVM02name": "[concat('LabVM02-',parameters('DeploymentID'))]",
+        "WinServerLabVM02-networkInterface": "[concat('labvm02',parameters('DeploymentID'))]",
+        "WinServerLabVM02-publicip": "[concat('LabVM02-ip', parameters('DeploymentID'))]",
+        "WinServerLabVM02-OSDisk-Name": "[concat(variables('WinServerLabVM02name'), '_OsDisk_1_', uniqueString(resourceGroup().id))]",
+        "location": "[resourceGroup().location]",
+        "MetasploitVM-name": "[concat('MetasploitVM-',parameters('DeploymentID'))]",
+        "MetasploitVM-networkInterface": "[concat('MetasploitVM',parameters('DeploymentID'))]",
+        "MetasploitVM-publicip": "[concat('MetasploitVM-ip',parameters('DeploymentID'))]",
+        "MetasploitVM-OSDisk-Name": "[concat(variables('MetasploitVM-name'), '_OsDisk_1_', uniqueString(resourceGroup().id))]",
+        "MetasploitVMDNSLabelName": "[toLower(concat(variables('MetasploitVM-name'),uniqueString(resourceGroup().id)))]",
+        "KaliVMDNSLabelName": "[toLower(concat(variables('KaliVM-name'),uniqueString(resourceGroup().id)))]",
+        "LabVM01DNSLabelName": "[toLower(concat(variables('WinServerLabVM01name'),uniqueString(resourceGroup().id)))]",
+        "LabVM02DNSLabelName": "[toLower(concat(variables('WinServerLabVM02name'),uniqueString(resourceGroup().id)))]",
+        "customScriptExtensionURI": "https://experienceazure.blob.core.windows.net/templates/simplilearn/Cyberlabs/psscript.ps1",
+        "cloudlabsExtensionURI": "https://experienceazure.blob.core.windows.net/templates/simplilearn/Cyberlabs/cloudlabs-windows-functions.ps1",
+        "MetasploitVM-ImageReference": "/subscriptions/96f6ea3e-6a3e-4bfa-b2d3-a3ea9f278cd2/resourceGroups/cloudlabs-cyberlabs-mgmt-rg/providers/Microsoft.Compute/galleries/CyberLabs_ImageGallery/images/CyberLab03-MetasploitVM-Latest/versions/Latest",
+        "KaliVM-ImageReference": "/subscriptions/96f6ea3e-6a3e-4bfa-b2d3-a3ea9f278cd2/resourceGroups/cloudlabs-cyberlabs-mgmt-rg/providers/Microsoft.Compute/galleries/CyberLabs_ImageGallery/images/Cyberlab-Kalilinux-2025/versions/Latest",
+        "LabVM01-ImageReference": "/subscriptions/96f6ea3e-6a3e-4bfa-b2d3-a3ea9f278cd2/resourceGroups/cloudlabs-cyberlabs-mgmt-rg/providers/Microsoft.Compute/galleries/CyberLabs_ImageGallery/images/CyberLab02-WinServer-01/versions/Latest",
+        "LabVM02-ImageReference": "/subscriptions/96f6ea3e-6a3e-4bfa-b2d3-a3ea9f278cd2/resourceGroups/cloudlabs-cyberlabs-mgmt-rg/providers/Microsoft.Compute/galleries/CyberLabs_ImageGallery/images/WindowsServer-02/versions/Latest",
+        "Enable-CloudLabsEmbeddedShadow": "[concat(' -trainerUserName ', parameters('trainerUserName'), ' -trainerUserPassword ', parameters('trainerUserPassword'))]",
+        "PublicIPAddressesSku": {
+            "name": "Standard",
+            "tier": "Regional"
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('LabVNet-nsg-name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]"
+            ],
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "SSH",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "22",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 300,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "RDP",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 310,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "ICMP",
+                        "properties": {
+                            "priority": 320,
+                            "protocol": "ICMP",
+                            "access": "Allow",
+                            "direction": "Inbound",
+                            "sourceAddressPrefix": "*",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "*"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('Kali-Meta-nsg-name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]"
+            ],
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "AllowAllInbound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('MetasploitVM-publicip')]",
+            "location": "[variables('location')]",
+            "sku": "[variables('PublicIPAddressesSku')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]"
+            ],
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('MetasploitVMDNSLabelName')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('KaliVM-publicip')]",
+            "location": "[variables('location')]",
+            "sku": "[variables('PublicIPAddressesSku')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]"
+            ],
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('KaliVMDNSLabelName')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('WinServerLabVM01-publicip')]",
+            "location": "[variables('location')]",
+            "sku": "[variables('PublicIPAddressesSku')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]"
+            ],
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('LabVM01DNSLabelName')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('WinServerLabVM02-publicip')]",
+            "location": "[variables('location')]",
+            "sku": "[variables('PublicIPAddressesSku')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]"
+            ],
+            "properties": {
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('LabVM02DNSLabelName')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('LabVNet-name')]",
+            "location": "[variables('location')]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/24"
+                    ]
+                },
+                "encryption": {
+                    "enabled": false,
+                    "enforcement": "AllowUnencrypted"
+                },
+                "privateEndpointVNetPolicies": "Disabled",
+                "subnets": [
+                    {
+                        "name": "default-subnet",
+                        "properties": {
+                            "addressPrefixes": [
+                                "10.0.0.0/24"
+                            ]
+                        }
+                    }
+                ],
+                "enableDdosProtection": false
+            }
+        },
+                {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2024-11-01",
+            "name": "[variables('MetasploitVM-name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', variables('MetasploitVM-networkInterface'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_B2ls_v2"
+                },
+                "additionalCapabilities": {
+                    "hibernationEnabled": false
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "id": "[variables('MetasploitVM-ImageReference')]"
+                    },
+                    "osDisk": {
+                        "osType": "Linux",
+                        "name": "[variables('MetasploitVM-OSDisk-Name')]",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        },
+                        "deleteOption": "Delete",
+                        "diskSizeGB": 64
+                    },
+                    "diskControllerType": "SCSI"
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('MetasploitVM-networkInterface'))]",
+                            "properties": {
+                                "deleteOption": "Delete"
+                            }
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2024-11-01",
+            "name": "[variables('KaliVM-name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', variables('KaliVM-networkInterface'))]"
+            ],
+            "plan": {
+                "name": "kali-2025-4",
+                "product": "kali",
+                "publisher": "kali-linux"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_B2ls_v2"
+                },
+                "additionalCapabilities": {
+                    "hibernationEnabled": false
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "id": "[variables('KaliVM-ImageReference')]"
+                    },
+                    "osDisk": {
+                        "osType": "Linux",
+                        "name": "[variables('KaliVM-OSDisk-Name')]",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        },
+                        "deleteOption": "Delete",
+                        "diskSizeGB": 128
+                    },
+                    "diskControllerType": "SCSI"
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('KaliVM-networkInterface'))]",
+                            "properties": {
+                                "deleteOption": "Delete"
+                            }
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2024-11-01",
+            "name": "[variables('WinServerLabVM01name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', variables('WinServerLabVM01-networkInterface'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_B2s_v2"
+                },
+                "additionalCapabilities": {
+                    "hibernationEnabled": false
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "id": "[variables('LabVM01-ImageReference')]"
+                    },
+                    "osDisk": {
+                        "name": "[variables('WinServerLabVM01-OSDisk-Name')]",
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        },
+                        "deleteOption": "Delete",
+                        "diskSizeGB": 128
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('WinServerLabVM01-networkInterface'))]",
+                            "properties": {
+                                "deleteOption": "Detach"
+                            }
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                },
+                "licenseType": "Windows_Server"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2024-11-01",
+            "name": "[variables('WinServerLabVM02name')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', variables('WinServerLabVM02-networkInterface'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_B2s_v2"
+                },
+                "additionalCapabilities": {
+                    "hibernationEnabled": false
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "id": "[variables('LabVM02-ImageReference')]"
+                    },
+                    "osDisk": {
+                        "name": "[variables('WinServerLabVM02-OSDisk-Name')]",
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS"
+                        },
+                        "deleteOption": "Delete",
+                        "diskSizeGB": 128
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('WinServerLabVM02-networkInterface'))]",
+                            "properties": {
+                                "deleteOption": "Delete"
+                            }
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                },
+                "licenseType": "Windows_Server"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('MetasploitVM-networkInterface')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('MetasploitVM-publicip'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('Kali-Meta-nsg-name'))]"
+            ],
+            "kind": "Regular",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "10.0.0.7",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('MetasploitVM-publicip'))]",
+                                "properties": {
+                                    "deleteOption": "Delete"
+                                }
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('LabVNet-name'), 'default-subnet')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": false,
+                "enableIPForwarding": false,
+                "disableTcpStateTracking": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('Kali-Meta-nsg-name'))]"
+                },
+                "nicType": "Standard",
+                "auxiliaryMode": "None",
+                "auxiliarySku": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('KaliVM-networkInterface')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('KaliVM-publicip'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('Kali-Meta-nsg-name'))]"
+            ],
+            "kind": "Regular",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "10.0.0.6",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('KaliVM-publicip'))]",
+                                "properties": {
+                                    "deleteOption": "Delete"
+                                }
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('LabVNet-name'), 'default-subnet')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": false,
+                "enableIPForwarding": false,
+                "disableTcpStateTracking": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('Kali-Meta-nsg-name'))]"
+                },
+                "nicType": "Standard",
+                "auxiliaryMode": "None",
+                "auxiliarySku": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('WinServerLabVM01-networkInterface')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('WinServerLabVM01-publicip'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('LabVNet-nsg-name'))]"
+            ],
+            "kind": "Regular",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "10.0.0.4",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('WinServerLabVM01-publicip'))]",
+                                "properties": {
+                                    "deleteOption": "Detach"
+                                }
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('LabVNet-name'), 'default-subnet')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": true,
+                "enableIPForwarding": false,
+                "disableTcpStateTracking": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('LabVNet-nsg-name'))]"
+                },
+                "nicType": "Standard",
+                "auxiliaryMode": "None",
+                "auxiliarySku": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2024-05-01",
+            "name": "[variables('WinServerLabVM02-networkInterface')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('WinServerLabVM02-publicip'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('LabVNet-name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('LabVNet-nsg-name'))]"
+            ],
+            "kind": "Regular",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "10.0.0.5",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('WinServerLabVM02-publicip'))]",
+                                "properties": {
+                                    "deleteOption": "Delete"
+                                }
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('LabVNet-name'), 'default-subnet')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": true,
+                "enableIPForwarding": false,
+                "disableTcpStateTracking": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('LabVNet-nsg-name'))]"
+                },
+                "nicType": "Standard",
+                "auxiliaryMode": "None",
+                "auxiliarySku": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2015-06-15",
+            "name": "[concat(variables('WinServerLabVM01name'), '/', 'winExtension')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', variables('WinServerLabVM01name'))]"
+            ],
+            "tags": {},
+            "properties": {
+                "publisher": "Microsoft.Compute",
+                "type": "CustomScriptExtension",
+                "typeHandlerVersion": "1.10",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "fileUris": [
+                        "[variables('customScriptExtensionURI')]",
+                        "[variables('cloudlabsExtensionURI')]"
+                    ]
+                },
+                "protectedSettings": {
+                    "commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -File simplilearn/Cyberlabs/psscript.ps1 ', variables('Enable-CloudLabsEmbeddedShadow'), ' ', parameters('WinServerLabVM01Username'), ' ', parameters('WinServerLabVM01Password'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2015-06-15",
+            "name": "[concat(variables('WinServerLabVM02name'), '/', 'winExtension02')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', variables('WinServerLabVM02name'))]"
+            ],
+            "tags": {},
+            "properties": {
+                "publisher": "Microsoft.Compute",
+                "type": "CustomScriptExtension",
+                "typeHandlerVersion": "1.10",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "fileUris": [
+                        "[variables('customScriptExtensionURI')]",
+                        "[variables('cloudlabsExtensionURI')]"
+                    ]
+                },
+                "protectedSettings": {
+                    "commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -File simplilearn/Cyberlabs/psscript.ps1 ', variables('Enable-CloudLabsEmbeddedShadow'), ' ', parameters('WinServerLabVM02Username'), ' ', parameters('WinServerLabVM02Password'))]"
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "Kali VM Name": {
+            "type": "string",
+            "value": "[variables('KaliVM-name')]"
+        },
+        "Kali VM Username": {
+            "type": "string",
+            "value": "[parameters('KaliLabVMUsername')]"
+        },
+        "Kali VM Password": {
+            "type": "string",
+            "value": "[parameters('KaliLabVMPassword')]"
+        },
+        "Kali VM DNS Name": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('KaliVM-publicip'))).dnsSettings.fqdn]"
+        },
+        "Windows LabVM01 Name": {
+            "type": "string",
+            "value": "[variables('WinServerLabVM01name')]"
+        },
+        "Windows LabVM01 Username": {
+            "type": "string",
+            "value": "[parameters('WinServerLabVM01Username')]"
+        },
+        "Windows LabVM01 Password": {
+            "type": "string",
+            "value": "[parameters('WinServerLabVM01Password')]"
+        },
+        "Windows LabVM01 DNS Name": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('WinServerLabVM01-publicip'))).dnsSettings.fqdn]"
+        },
+        "Windows LabVM02 Name": {
+            "type": "string",
+            "value": "[variables('WinServerLabVM02name')]"
+        },
+        "Windows LabVM02 Username": {
+            "type": "string",
+            "value": "[parameters('WinServerLabVM02Username')]"
+        },
+        "Windows LabVM02 Password": {
+            "type": "string",
+            "value": "[parameters('WinServerLabVM02Password')]"
+        },
+        "Windows LabVM02 DNS Name": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('WinServerLabVM02-publicip'))).dnsSettings.fqdn]"
+        },
+        "Metasploit VM Name": {
+            "type": "string",
+            "value": "[variables('MetasploitVM-name')]"
+        },
+        "Metasploit VM Username": {
+            "type": "string",
+            "value": "[parameters('MetasploitLabVMUsername')]"
+        },
+        "Metasploit VM Password": {
+            "type": "string",
+            "value": "[parameters('MetasploitLabVMPassword')]"
+        },
+        "Metasploit VM DNS Name": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('MetasploitVM-publicip'))).dnsSettings.fqdn]"
+        },
+        "Trainer Username": {
+            "type": "string",
+            "value": "[parameters('trainerUserName')]"
+        },
+        "Trainer Password": {
+            "type": "string",
+            "value": "[parameters('trainerUserPassword')]"
+        }
+    }
+}
