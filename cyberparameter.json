@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "DeploymentID": {
+      "value": "GET-DEPLOYMENT-ID"
+    },
+    "DeploymentRegion": {
+      "value": "centralus"
+    },
+    "WinServerLabVM01Username": {
+      "value": "labuser01"
+    },
+    "WinServerLabVM01Password": {
+      "value": "Password.1!!"
+    },
+    "WinServerLabVM02Username": {
+      "value": "labuser02"
+    },
+    "WinServerLabVM02Password": {
+      "value": "Password.2!!"
+    },
+    "KaliLabVMUsername": {
+      "value": "kaliuser"
+    },
+    "KaliLabVMPassword": {
+      "value": "Password.3!!"
+    },
+    "MetasploitLabVMUsername": {
+      "value": "msfadmin"
+    },
+    "MetasploitLabVMPassword": {
+      "value": "msfadmin"
+    },
+    "trainerUserName": {
+      "value": "traineruser"
+    },
+    "trainerUserPassword": {
+      "value": "Password.1!!"
+    }
+  }
+}
